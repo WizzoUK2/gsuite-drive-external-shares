@@ -1,0 +1,11 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Output and logs
+output/
+*.log
+
+# OS and editor junk
+.DS_Store
+*.swp
