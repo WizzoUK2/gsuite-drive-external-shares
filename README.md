@@ -18,5 +18,6 @@ This tool uses GAM to:
 python gam_script.py --user alice@example.com --domain example.com --dry-run
 
 python gam_script.py --workspace --domain example.com --external-users-file external_users.txt --remove
+```
 
-
+The script now prints clearer errors if GAM is missing or not configured.
