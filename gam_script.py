@@ -1,6 +1,6 @@
 import subprocess
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import csv
 import os
 from pathlib import Path
@@ -27,10 +27,21 @@ def setup_logging():
 def run_gam_command(args):
     """Run a GAM command and return output as text"""
     logging.info(f"Running GAM: gam {' '.join(args)}")
-    result = subprocess.run(["gam"] + args, capture_output=True, text=True)
+    try:
+        result = subprocess.run(["gam"] + args, capture_output=True, text=True)
+    except FileNotFoundError as e:
+        raise RuntimeError("'gam' command not found. Please install GAM and ensure it is on your PATH.") from e
+
     if result.returncode != 0:
-        logging.error(f"Command failed: {result.stderr}")
-        raise RuntimeError(f"Command failed: {result.stderr}")
+        err = result.stderr.strip()
+        logging.error(f"Command failed: {err}")
+        if (
+            "No Client Access allowed" in err
+            or "oauth2service_json" in err
+            or "oauth2.txt" in err
+        ):
+            err += " - GAM appears to be unauthenticated. Run 'gam oauth create' or configure your service account."
+        raise RuntimeError(f"Command failed: {err}")
     return result.stdout
 
 def get_drive_files_for_user(user):
@@ -91,6 +102,12 @@ def main():
     parser.add_argument("--auth-mode", choices=["personal", "service"], default="service", help="Choose auth mode: 'personal' for OAuth flow (opens browser), 'service' for Workspace service account (default)")
 
     args = parser.parse_args()
+
+    setup_logging()
+
+    if '.' not in args.domain:
+        logging.error(f"Invalid domain '{args.domain}'. Please provide a valid domain name.")
+        return
     if args.auth_mode == "personal":
         logging.info("Using personal OAuth mode. Running 'gam oauth create'...")
         try:
@@ -101,8 +118,7 @@ def main():
             return
     else:
         logging.info("Using service account mode (domain-wide delegation).")
-    
-    setup_logging()
+
     logging.info("==== Drive Sharing Scan Started ====")
 
     external_users = parse_external_users(args.external_users_file)
@@ -148,7 +164,7 @@ def main():
 def write_run_log(script_name, status, user, domain, dry_run, checked, removed):
     log_entry = {
         "script": script_name,
-        "run_at": datetime.utcnow().isoformat() + "Z",
+        "run_at": datetime.now(timezone.utc).isoformat(),
         "status": status,
         "user": user,
         "domain": domain,
